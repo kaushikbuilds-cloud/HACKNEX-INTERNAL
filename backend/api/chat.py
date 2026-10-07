@@ -151,20 +151,21 @@ def analyze(req: AnalyzeRequest):
     static_report = run_static_analysis(session.root)
     security_report = run_security_scan(session.root)
 
-    findings = find_bugs(
-        llm,
-        context,
-        session.profile.to_dict(),
-        static_report.summary(),
-        security_report.summary(),
-    )
+    bug_report = find_bugs(llm, context, session.profile.to_dict(), static_report, security_report)
 
     return {
         "findings": [
-            {"file": f.file, "line": f.line, "severity": f.severity, "description": f.description}
-            for f in findings
+            {
+                "file": f.file,
+                "line": f.line,
+                "severity": f.severity,
+                "description": f.description,
+                "source": f.source,
+            }
+            for f in bug_report.findings
         ],
-        "report": render_bug_report(findings),
-        "static_summary": static_report.summary(),
-        "security_summary": security_report.summary(),
+        "report": render_bug_report(bug_report),
+        "static_summary": bug_report.static_summary,
+        "security_summary": bug_report.security_summary,
+        "llm_available": bug_report.llm_available,
     }

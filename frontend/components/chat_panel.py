@@ -132,6 +132,13 @@ def _render_analyze_mode() -> None:
                 st.error(f"Analysis failed: {exc}")
                 return
 
+        if not result.get("llm_available", True):
+            st.info(
+                "The local LLM wasn't reachable, so these are deterministic static-analysis "
+                "and security-scan findings only (no false negatives from that scan, but no "
+                "LLM-reasoned logic bugs either). Start Ollama and re-run to also get those."
+            )
+
         findings = result.get("findings", [])
         if not findings:
             st.success("No bugs found in the reviewed code.")
@@ -141,7 +148,8 @@ def _render_analyze_mode() -> None:
                 kind = _SEVERITY_PILL_KIND.get(f["severity"], "warning")
                 location = f"{f['file']}:{f['line']}" if f.get("line") else f["file"]
                 st.markdown(
-                    f"{status_pill(f['severity'].upper(), kind)} **{location}**",
+                    f"{status_pill(f['severity'].upper(), kind)} **{location}** "
+                    f"<span style='color:#888'>({f.get('source', 'llm')})</span>",
                     unsafe_allow_html=True,
                 )
                 st.write(f["description"])

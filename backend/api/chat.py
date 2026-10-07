@@ -13,6 +13,8 @@ from backend.llm.client import get_default_client
 from backend.llm.confidence_score import score_confidence
 from backend.llm.explanation import build_explanation
 from backend.patch.diff_generator import full_diff
+from backend.patch.git_manager import commit_all
+from backend.patch.rollback import rollback_to
 from backend.planner.change_planner import make_plan
 from backend.testing.baseline_diff import ValidationDiff, diff_reports
 from backend.testing.retry_agent import generate_and_validate
@@ -45,6 +47,19 @@ def chat(req: ChatRequest):
     session.heal = heal
     session.diff = full_diff(heal.edits)
 
+    # Commit locally once the fix actually passes validation — never on a
+    # failed/intermediate attempt, and never pushed anywhere yet. Pushing
+    # to the remote is a separate, explicitly user-confirmed step.
+    rolled_back = False
+    if heal.report.passed:
+        commit_message = f"swe-agent: {plan.understanding}".strip() or "swe-agent: automated change"
+        commit_all(session.root, commit_message[:200])
+    elif session.base_ref is not None:
+        # Exhausted every retry and never converged — don't leave a broken
+        # work branch sitting in the repo.
+        rollback_to(session.root, session.base_ref, work_branch=req.branch)
+        rolled_back = True
+
     vdiff = diff_reports(session.baseline, heal.report) if session.baseline else ValidationDiff()
     confidence = score_confidence(
         tests_passed=heal.report.passed,
@@ -56,6 +71,7 @@ def chat(req: ChatRequest):
         new_security_high=vdiff.new_security_high,
         new_security_medium=vdiff.new_security_medium,
         new_static_issues=vdiff.new_static_issues,
+        no_test_suite=heal.report.no_test_suite,
     )
 
     explanation = build_explanation(
@@ -68,9 +84,12 @@ def chat(req: ChatRequest):
         attempts=heal.attempts,
         baseline_passed=session.baseline.passed if session.baseline else False,
     )
+    if rolled_back:
+        explanation += "\nThe change did not pass validation after all retries, so it was rolled back — the repo is back to its original state."
 
     return {
         "success": heal.report.passed,
+        "rolled_back": rolled_back,
         "plan": plan.raw,
         "explanation": explanation,
         "confidence": confidence,

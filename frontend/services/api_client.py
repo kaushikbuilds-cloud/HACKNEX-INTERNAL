@@ -33,6 +33,16 @@ def get_patch(session_id: str) -> dict:
     return resp.json()
 
 
+def push_patch(session_id: str, branch: str, confirm: bool) -> dict:
+    resp = requests.post(
+        f"{BACKEND_URL}/patch/push",
+        json={"session_id": session_id, "branch": branch, "confirm": confirm},
+        timeout=TIMEOUT,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
 def get_test_report(session_id: str) -> dict:
     resp = requests.get(f"{BACKEND_URL}/report/{session_id}/tests", timeout=TIMEOUT)
     resp.raise_for_status()

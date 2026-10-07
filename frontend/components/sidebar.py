@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import streamlit as st
 
+from frontend.components.theme import apply_theme
 from frontend.state.session_state import has_loaded_repo
 
 
 def render_sidebar() -> None:
+    apply_theme()
     with st.sidebar:
         st.markdown("### AI Software Engineering Agent")
         if has_loaded_repo():

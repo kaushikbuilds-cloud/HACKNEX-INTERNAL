@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import git
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -34,6 +35,10 @@ def load_repository(req: LoadRepoRequest):
     session.profile = profile
     session.store = store
     session.baseline = baseline
+    try:
+        session.base_ref = git.Repo(root).active_branch.name
+    except (git.InvalidGitRepositoryError, TypeError):
+        session.base_ref = None  # not a git repo, or detached HEAD — can't roll back later
 
     return {
         "session_id": session.id,

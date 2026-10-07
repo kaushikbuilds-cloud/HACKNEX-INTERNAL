@@ -7,3 +7,4 @@ venv/
 workdir/
 out/
 scratch/
+.env

@@ -6,7 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from backend.embeddings.chromadb_manager import ChromaDBManager
-from backend.repository.parser import chunk_file, iter_source_files
+from backend.repository.parser import Chunk, chunk_file, iter_source_files
 
 
 def build_index(root: Path) -> ChromaDBManager:
@@ -25,6 +25,15 @@ def relevant_files(store: ChromaDBManager, request: str, top_k: int = 8) -> list
         if len(seen) >= top_k:
             break
     return seen
+
+
+def best_chunk_in_file(store: ChromaDBManager, file: str, query: str) -> Chunk | None:
+    """Of the chunks belonging to `file`, return the one most relevant to
+    `query` — used to target a single function/class for large-file edits."""
+    for chunk, _score in store.search(query, top_k=max(len(store), 1)):
+        if chunk.file == file:
+            return chunk
+    return None
 
 
 def build_context(

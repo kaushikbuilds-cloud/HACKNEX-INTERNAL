@@ -8,8 +8,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from backend.core.config import settings
+from backend.core.constants import LARGE_FILE_LINE_THRESHOLD
+from backend.embeddings.chromadb_manager import ChromaDBManager
+from backend.embeddings.vector_search import best_chunk_in_file
 from backend.llm.client import LLMClient
-from backend.llm.code_generator import FileEdit, generate_file_edit
+from backend.llm.code_generator import FileEdit, generate_chunk_edit, generate_file_edit
 from backend.patch.apply_patch import apply_edits
 from backend.planner.change_planner import Plan
 from backend.repository.repository_profile import RepositoryProfile
@@ -33,6 +36,7 @@ def generate_and_validate(
     related_context: str,
     branch: str,
     max_attempts: int | None = None,
+    store: ChromaDBManager | None = None,
 ) -> HealResult:
     max_attempts = max_attempts or settings.max_retry_attempts
     attempt = 0
@@ -47,9 +51,17 @@ def generate_and_validate(
             full_path = Path(root) / rel_path
             original = full_path.read_text() if full_path.exists() else ""
             plan_summary = "\n".join(plan.steps) + extra_note
-            edit = generate_file_edit(
-                llm, rel_path, original, plan_summary, request, related_context
-            )
+            is_large = len(original.splitlines()) > LARGE_FILE_LINE_THRESHOLD
+
+            chunk = best_chunk_in_file(store, rel_path, request) if (is_large and store) else None
+            if chunk is not None:
+                edit = generate_chunk_edit(
+                    llm, rel_path, original, chunk, plan_summary, request, related_context
+                )
+            else:
+                edit = generate_file_edit(
+                    llm, rel_path, original, plan_summary, request, related_context
+                )
             edits.append(edit)
 
         apply_edits(root, edits, branch)

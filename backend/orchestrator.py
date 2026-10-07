@@ -78,7 +78,7 @@ def run_pipeline(
     # Generate code changes, apply patch, run tests, self-heal on failure
     heal = generate_and_validate(
         llm, root, profile, plan, request, context, branch,
-        max_attempts=settings.max_retry_attempts,
+        max_attempts=settings.max_retry_attempts, store=store,
     )
 
     from backend.patch.diff_generator import full_diff

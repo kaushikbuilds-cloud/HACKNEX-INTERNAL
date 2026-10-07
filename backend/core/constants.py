@@ -41,3 +41,8 @@ DOC_EXTS = {".md", ".rst", ".txt"}
 
 MAX_RETRY_ATTEMPTS = 3
 EMBEDDING_DIM = 512
+
+# Above this many lines, whole-file rewrite stops being reliable (context
+# window limits on a local model, falling accuracy on huge rewrites) — the
+# code generator switches to editing just the relevant chunk instead.
+LARGE_FILE_LINE_THRESHOLD = 300

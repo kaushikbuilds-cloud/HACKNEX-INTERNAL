@@ -58,6 +58,7 @@ def generate_and_validate(
     branch: str,
     max_attempts: int | None = None,
     store: ChromaDBManager | None = None,
+    python_executable: str | None = None,
 ) -> HealResult:
     max_attempts = max_attempts or settings.max_retry_attempts
     attempt = 0
@@ -96,7 +97,9 @@ def generate_and_validate(
             edits.append(edit)
 
         apply_edits(root, edits, branch)
-        last_report = run_validation(root, profile, skip_install=attempt > 1)
+        last_report = run_validation(
+            root, profile, skip_install=attempt > 1, python_executable=python_executable
+        )
 
         if last_report.passed:
             return HealResult(last_report, edits, attempt, healed=attempt > 1)

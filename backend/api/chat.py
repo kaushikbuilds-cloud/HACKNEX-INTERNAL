@@ -55,6 +55,7 @@ def chat(req: ChatRequest):
     heal = generate_and_validate(
         llm, session.root, session.profile, plan, req.message, context, req.branch,
         max_attempts=settings.max_retry_attempts, store=session.store,
+        python_executable=session.python_executable,
     )
 
     session.plan = plan

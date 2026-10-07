@@ -14,6 +14,7 @@ from backend.embeddings.vector_search import build_index
 from backend.reports.repository_summary import render_repository_summary
 from backend.repository.clone_repo import resolve_target
 from backend.repository.scanner import scan_repo
+from backend.sandbox.venv_manager import build_sandbox
 from backend.testing.validator import run_validation
 
 router = APIRouter(prefix="/repository", tags=["repository"])
@@ -28,7 +29,16 @@ def load_repository(req: LoadRepoRequest):
     session = create_session()
     root = resolve_target(req.source, Path(settings.workdir))
     profile = scan_repo(root)
-    baseline = run_validation(root, profile)
+
+    # Isolated venv for *this repo's own* dependencies, so a missing package
+    # (e.g. a target repo's python-jose) never crashes against the host's
+    # environment and never leaks between sessions loading different repos.
+    # Best-effort: falls back to the host interpreter on any failure, so a
+    # sandbox problem never blocks loading the repo.
+    sandbox_dir = Path(settings.workdir) / ".sandboxes" / session.id
+    session.sandbox = build_sandbox(root, sandbox_dir)
+
+    baseline = run_validation(root, profile, python_executable=session.python_executable)
     store = build_index(root)
 
     session.root = root
@@ -44,6 +54,10 @@ def load_repository(req: LoadRepoRequest):
         "session_id": session.id,
         "profile": render_repository_summary(profile),
         "baseline_tests_passed": baseline.passed,
+        "sandbox": {
+            "isolated": session.sandbox.isolated,
+            "warnings": session.sandbox.warnings,
+        },
     }
 
 

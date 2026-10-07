@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -67,25 +68,37 @@ class TestReport:
         return "\n".join(lines)
 
 
-def run_command(command: str, cwd: Path, timeout: int = 600) -> CommandResult:
+def run_command(
+    command: str, cwd: Path, timeout: int = 600, python_executable: str | None = None
+) -> CommandResult:
+    # Commands from scanner.py use a "{python}" placeholder so install/test
+    # runs with the session's isolated sandbox venv interpreter when one
+    # exists, instead of whatever "pip"/"python" happens to be first on the
+    # host's PATH (see backend/sandbox/venv_manager.py). Commands with no
+    # placeholder (e.g. "npm install") are unaffected.
+    resolved = command.format(python=python_executable or sys.executable) if "{python}" in command else command
     proc = subprocess.run(
-        command, shell=True, cwd=cwd, capture_output=True, text=True, timeout=timeout
+        resolved, shell=True, cwd=cwd, capture_output=True, text=True, timeout=timeout
     )
-    return CommandResult(command, proc.returncode, proc.stdout, proc.stderr)
+    return CommandResult(resolved, proc.returncode, proc.stdout, proc.stderr)
 
 
 def run_validation(
-    root: Path, profile: RepositoryProfile, skip_install: bool = False, run_static: bool = True
+    root: Path,
+    profile: RepositoryProfile,
+    skip_install: bool = False,
+    run_static: bool = True,
+    python_executable: str | None = None,
 ) -> TestReport:
     from backend.testing.build_runner import run_build
     from backend.testing.test_runner import run_tests
 
     install_result = None
     if profile.install_command and not skip_install:
-        install_result = run_command(profile.install_command, root)
+        install_result = run_command(profile.install_command, root, python_executable=python_executable)
 
-    build_result = run_build(root, profile)
-    test_result = run_tests(root, profile)
+    build_result = run_build(root, profile, python_executable=python_executable)
+    test_result = run_tests(root, profile, python_executable=python_executable)
 
     static_report = None
     security_report = None

@@ -50,22 +50,26 @@ def _detect_python(root: Path, profile: RepositoryProfile) -> None:
     if not has_marker and "python" not in profile.languages:
         return
 
+    # "{python}" is substituted by validator.run_command with the session's
+    # sandbox venv interpreter when one exists, so install/test run isolated
+    # from the host's own environment — falls back to the host interpreter
+    # otherwise (see backend/sandbox/venv_manager.py).
     if (root / "pyproject.toml").exists():
         profile.build_tool = "pip"
-        profile.install_command = "pip install -e ."
+        profile.install_command = "{python} -m pip install -e ."
     elif (root / "requirements.txt").exists():
         profile.build_tool = "pip"
-        profile.install_command = "pip install -r requirements.txt"
+        profile.install_command = "{python} -m pip install -r requirements.txt"
     elif (root / "setup.py").exists():
         profile.build_tool = "pip"
-        profile.install_command = "pip install -e ."
+        profile.install_command = "{python} -m pip install -e ."
 
     has_pytest_ini = (root / "pytest.ini").exists() or (root / "conftest.py").exists()
     has_tests_dir = (root / "tests").is_dir() or (root / "test").is_dir()
     pyproject_text = safe_read_text(root / "pyproject.toml")
     if has_pytest_ini or has_tests_dir or "pytest" in pyproject_text:
         profile.test_framework = "pytest"
-        profile.test_command = "pytest -q"
+        profile.test_command = "{python} -m pytest -q"
 
 
 def _detect_node(root: Path, profile: RepositoryProfile) -> None:

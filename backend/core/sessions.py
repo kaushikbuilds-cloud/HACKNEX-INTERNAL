@@ -4,6 +4,7 @@ local dev/demo deployment; swap for Redis if this needs to scale out."""
 
 from __future__ import annotations
 
+import sys
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -21,6 +22,16 @@ class Session:
     baseline: Any = None
     diff: str = ""
     base_ref: str | None = None  # branch the repo was on before the agent touched it
+    sandbox: Any = None  # backend.sandbox.venv_manager.Sandbox, once the repo is loaded
+
+    @property
+    def python_executable(self) -> str:
+        """The interpreter install/build/test commands should run with —
+        the session's isolated sandbox venv if one was built, else the host
+        interpreter (e.g. before load completes, or on sandbox fallback)."""
+        if self.sandbox is not None:
+            return self.sandbox.python
+        return sys.executable
 
 
 _sessions: dict[str, Session] = {}

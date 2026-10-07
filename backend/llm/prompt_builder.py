@@ -89,6 +89,48 @@ Rules:
 """
 
 
+ANALYZE_SYSTEM_PROMPT = """You are a senior software engineer reviewing code for bugs. This is a READ-ONLY review — you are NOT fixing anything, NOT proposing a patch, and must NOT output any file content or edits.
+
+Rules:
+- Only report bugs you can see concrete evidence for in the provided code. Never invent an issue.
+- Do not comment on style, formatting, or naming — only real defects: logic errors, incorrect conditions, off-by-one errors, unhandled edge cases, resource leaks, broken error handling, security issues, etc.
+- Each finding must point to a specific file and, where possible, a line or function.
+- If nothing is clearly wrong in the provided code, return an empty findings list — do not invent a problem to report.
+- Respond with ONLY a JSON object, no prose, matching this schema:
+{
+  "findings": [
+    {
+      "file": "path/to/file.py",
+      "line": 42,
+      "severity": "high" | "medium" | "low",
+      "description": "<what's wrong and why, 1-3 sentences>"
+    }
+  ]
+}
+"""
+
+
+def build_analyze_prompt(
+    context: str,
+    repo_profile: dict,
+    static_summary: str,
+    security_summary: str,
+) -> str:
+    return f"""Repository profile:
+{repo_profile}
+
+Code to review (retrieved by semantic search, plus flagged-as-suspicious chunks):
+{context}
+
+Automated static analysis findings (already known, do not just repeat these — look for additional logic bugs):
+{static_summary}
+
+Automated security scan findings (already known, do not just repeat these):
+{security_summary}
+
+Review the code above for bugs. Produce the JSON findings list now."""
+
+
 def build_chunk_codegen_prompt(
     path: str,
     chunk_name: str,

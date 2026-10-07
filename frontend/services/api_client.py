@@ -27,6 +27,16 @@ def send_chat(session_id: str, message: str, branch: str = "swe-agent/auto-fix")
     return resp.json()
 
 
+def analyze_repo(session_id: str, message: str = "") -> dict:
+    resp = requests.post(
+        f"{BACKEND_URL}/chat/analyze",
+        json={"session_id": session_id, "message": message},
+        timeout=TIMEOUT,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
 def get_patch(session_id: str) -> dict:
     resp = requests.get(f"{BACKEND_URL}/patch/{session_id}", timeout=TIMEOUT)
     resp.raise_for_status()

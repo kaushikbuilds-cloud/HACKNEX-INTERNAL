@@ -16,11 +16,15 @@ from backend.llm.merge_status import determine_merge_status
 from backend.patch.diff_generator import full_diff
 from backend.patch.git_manager import commit_all
 from backend.patch.rollback import rollback_to
+from backend.planner.bug_finder import BUG_HUNT_QUERY, find_bugs
 from backend.planner.change_planner import make_plan
 from backend.planner.file_selector import select_candidate_files
+from backend.reports.bug_report import render_bug_report
 from backend.repository.dependency_graph import build_blast_radius
 from backend.testing.baseline_diff import ValidationDiff, diff_reports
 from backend.testing.retry_agent import generate_and_validate
+from backend.testing.security_scanner import run_security_scan
+from backend.testing.static_analyzer import run_static_analysis
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -29,6 +33,11 @@ class ChatRequest(BaseModel):
     session_id: str
     message: str
     branch: str = "swe-agent/auto-fix"
+
+
+class AnalyzeRequest(BaseModel):
+    session_id: str
+    message: str = ""  # optional extra guidance (e.g. "focus on auth code")
 
 
 @router.post("")
@@ -123,4 +132,39 @@ def chat(req: ChatRequest):
             "new_static_issues": vdiff.new_static_issues,
             "summary": heal.report.summary(),
         },
+    }
+
+
+@router.post("/analyze")
+def analyze(req: AnalyzeRequest):
+    """Read-only bug-finding. Deliberately calls nothing from patch/,
+    git_manager, or retry_agent — this endpoint cannot modify the repo,
+    commit, or push, no matter what the request text says."""
+    session = get_session(req.session_id)
+    if session is None or session.root is None:
+        raise HTTPException(404, "session not found; load a repository first")
+
+    llm = get_default_client()
+    query = req.message.strip() or BUG_HUNT_QUERY
+    context = build_context(session.store, query)
+
+    static_report = run_static_analysis(session.root)
+    security_report = run_security_scan(session.root)
+
+    findings = find_bugs(
+        llm,
+        context,
+        session.profile.to_dict(),
+        static_report.summary(),
+        security_report.summary(),
+    )
+
+    return {
+        "findings": [
+            {"file": f.file, "line": f.line, "severity": f.severity, "description": f.description}
+            for f in findings
+        ],
+        "report": render_bug_report(findings),
+        "static_summary": static_report.summary(),
+        "security_summary": security_report.summary(),
     }

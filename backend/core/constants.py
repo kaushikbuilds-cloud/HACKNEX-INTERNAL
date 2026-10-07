@@ -13,7 +13,7 @@ IGNORE_DIRS = {
 
 CODE_EXTS = {
     ".py", ".js", ".jsx", ".ts", ".tsx", ".go", ".java",
-    ".rb", ".rs", ".c", ".cpp", ".cs",
+    ".rb", ".rs", ".c", ".cpp", ".cs", ".php",
 }
 
 EXT_LANG = {
@@ -29,6 +29,7 @@ EXT_LANG = {
     ".c": "c",
     ".cpp": "cpp",
     ".cs": "csharp",
+    ".php": "php",
 }
 
 TEST_PATH_HINTS = ("test", "tests", "spec", "__tests__")

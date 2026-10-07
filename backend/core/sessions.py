@@ -20,6 +20,7 @@ class Session:
     heal: Any = None
     baseline: Any = None
     diff: str = ""
+    base_ref: str | None = None  # branch the repo was on before the agent touched it
 
 
 _sessions: dict[str, Session] = {}

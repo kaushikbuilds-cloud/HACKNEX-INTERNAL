@@ -7,11 +7,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+import git
+
 from backend.core.config import settings
 from backend.embeddings.vector_search import build_context, build_index
 from backend.llm.client import LLMClient, get_default_client
 from backend.llm.confidence_score import score_confidence
 from backend.llm.explanation import build_explanation
+from backend.patch.rollback import rollback_to
 from backend.planner.change_planner import Plan, make_plan
 from backend.planner.file_selector import select_candidate_files
 from backend.repository.clone_repo import resolve_target
@@ -30,13 +33,14 @@ class RunResult:
     heal: HealResult
     diff: str
     confidence: float
+    rolled_back: bool = False
 
     @property
     def success(self) -> bool:
         return self.heal.report.passed
 
     def explanation(self) -> str:
-        return build_explanation(
+        text = build_explanation(
             understanding=self.plan.understanding,
             root_cause=self.plan.root_cause,
             files_changed=self.plan.files_to_change,
@@ -46,6 +50,9 @@ class RunResult:
             attempts=self.heal.attempts,
             baseline_passed=self.baseline.passed,
         )
+        if self.rolled_back:
+            text += "\nThe change did not pass validation after all retries, so it was rolled back — the repo is back to its original state."
+        return text
 
 
 def run_pipeline(
@@ -60,6 +67,13 @@ def run_pipeline(
     # Repository analysis
     root = resolve_target(source, workdir)
     profile = scan_repo(root)
+
+    # Remember what branch/ref we started on, so a failed fix can be
+    # rolled back cleanly instead of leaving a broken work branch behind.
+    try:
+        base_ref = git.Repo(root).active_branch.name
+    except (git.InvalidGitRepositoryError, TypeError):
+        base_ref = None  # not a git repo, or detached HEAD — can't roll back
 
     # Confirm the baseline: tests must already be green (or we note they
     # weren't) before we touch anything, so "did you break anything" is
@@ -98,7 +112,14 @@ def run_pipeline(
         new_static_issues=vdiff.new_static_issues,
     )
 
+    # Self-healing exhausted every retry and never converged — don't leave
+    # a broken branch sitting in the repo.
+    rolled_back = False
+    if not heal.report.passed and base_ref is not None:
+        rollback_to(root, base_ref, work_branch=branch)
+        rolled_back = True
+
     return RunResult(
         root=root, branch=branch, plan=plan, baseline=baseline,
-        heal=heal, diff=diff, confidence=confidence,
+        heal=heal, diff=diff, confidence=confidence, rolled_back=rolled_back,
     )

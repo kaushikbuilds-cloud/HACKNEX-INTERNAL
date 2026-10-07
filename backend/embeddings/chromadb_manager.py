@@ -21,7 +21,7 @@ class ChromaDBManager:
 
     def add(self, chunk: Chunk) -> None:
         self._chunks.append(chunk)
-        self._vectors.append(embed(f"{chunk.name}\n{chunk.text}"))
+        self._vectors.append(embed(f"{chunk.file} {chunk.name}\n{chunk.text}"))
 
     def search(self, query: str, top_k: int = 8) -> list[tuple[Chunk, float]]:
         qvec = embed(query)

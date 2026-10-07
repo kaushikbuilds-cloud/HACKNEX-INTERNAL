@@ -12,7 +12,8 @@ from backend.utils.file_utils import safe_read_text
 
 
 def _module_name(rel_path: str) -> str:
-    return rel_path[:-3].replace("/", ".").removesuffix(".__init__")
+    normalized = rel_path.replace("\\", "/").removesuffix(".py")
+    return normalized.replace("/", ".").removesuffix(".__init__")
 
 
 def build_dependency_graph(root: Path) -> dict[str, list[str]]:

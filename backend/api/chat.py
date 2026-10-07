@@ -16,6 +16,8 @@ from backend.patch.diff_generator import full_diff
 from backend.patch.git_manager import commit_all
 from backend.patch.rollback import rollback_to
 from backend.planner.change_planner import make_plan
+from backend.planner.file_selector import select_candidate_files
+from backend.repository.dependency_graph import build_blast_radius_summary
 from backend.testing.baseline_diff import ValidationDiff, diff_reports
 from backend.testing.retry_agent import generate_and_validate
 
@@ -35,8 +37,10 @@ def chat(req: ChatRequest):
         raise HTTPException(404, "session not found; load a repository first")
 
     llm = get_default_client()
+    candidate_files = select_candidate_files(session.store, req.message)
     context = build_context(session.store, req.message)
-    plan = make_plan(llm, req.message, context, session.profile.to_dict())
+    dependency_info = build_blast_radius_summary(session.root, candidate_files)
+    plan = make_plan(llm, req.message, context, session.profile.to_dict(), dependency_info)
 
     heal = generate_and_validate(
         llm, session.root, session.profile, plan, req.message, context, req.branch,

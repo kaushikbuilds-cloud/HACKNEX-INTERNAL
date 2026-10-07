@@ -52,3 +52,21 @@ def build_dependency_graph(root: Path) -> dict[str, list[str]]:
 def dependents_of(graph: dict[str, list[str]], module: str) -> list[str]:
     """Reverse lookup: which modules import `module` (what might break)."""
     return sorted(m for m, deps in graph.items() if module in deps)
+
+
+def build_blast_radius_summary(root: Path, candidate_files: list[str]) -> str:
+    """For each candidate file (a relative path), list which other modules
+    import it — so the planner can see the blast radius of touching it
+    BEFORE deciding to change it, not just after in an impact report."""
+    graph = build_dependency_graph(root)
+    lines = []
+    for rel_path in candidate_files:
+        if not rel_path.endswith(".py"):
+            continue
+        module = _module_name(rel_path)
+        dependents = dependents_of(graph, module)
+        if dependents:
+            lines.append(f"- {rel_path}: imported by {', '.join(dependents)}")
+        else:
+            lines.append(f"- {rel_path}: no other module in this repo imports it")
+    return "\n".join(lines)

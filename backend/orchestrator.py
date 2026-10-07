@@ -18,6 +18,7 @@ from backend.patch.rollback import rollback_to
 from backend.planner.change_planner import Plan, make_plan
 from backend.planner.file_selector import select_candidate_files
 from backend.repository.clone_repo import resolve_target
+from backend.repository.dependency_graph import build_blast_radius_summary
 from backend.repository.scanner import scan_repo
 from backend.testing.baseline_diff import diff_reports
 from backend.testing.retry_agent import HealResult, generate_and_validate
@@ -84,11 +85,12 @@ def run_pipeline(
     store = build_index(root)
 
     # Retrieve relevant files
-    _ = select_candidate_files(store, request)
+    candidate_files = select_candidate_files(store, request)
     context = build_context(store, request)
+    dependency_info = build_blast_radius_summary(root, candidate_files)
 
     # Planning agent
-    plan = make_plan(llm, request, context, profile.to_dict())
+    plan = make_plan(llm, request, context, profile.to_dict(), dependency_info)
 
     # Generate code changes, apply patch, run tests, self-heal on failure
     heal = generate_and_validate(

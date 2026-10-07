@@ -25,8 +25,14 @@ class Plan:
     raw: dict = field(default_factory=dict)
 
 
-def make_plan(llm: LLMClient, request: str, context: str, repo_profile: dict) -> Plan:
-    user_prompt = build_plan_prompt(request, context, repo_profile)
+def make_plan(
+    llm: LLMClient,
+    request: str,
+    context: str,
+    repo_profile: dict,
+    dependency_info: str = "",
+) -> Plan:
+    user_prompt = build_plan_prompt(request, context, repo_profile, dependency_info)
     messages = [
         Message("system", PLAN_SYSTEM_PROMPT),
         Message("user", user_prompt),

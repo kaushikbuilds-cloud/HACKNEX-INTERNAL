@@ -9,6 +9,7 @@ Rules:
 - Only use real code, real APIs, and real imports that exist in the provided context. Never invent one.
 - Prefer the smallest change that fixes the request.
 - Never remove or rewrite code unrelated to the request.
+- Before choosing which files to change, check the dependency graph: if a file you're considering is imported by other modules, changing its public functions/signatures can break those callers. Either avoid changing the signature, or include the dependent files in files_to_change so they stay consistent.
 - Identify exactly which existing tests are relevant, and whether new tests are needed.
 - Respond with ONLY a JSON object, no prose, matching this schema:
 {
@@ -32,13 +33,21 @@ Rules:
 """
 
 
-def build_plan_prompt(request: str, context: str, repo_profile: dict) -> str:
+def build_plan_prompt(
+    request: str, context: str, repo_profile: dict, dependency_info: str = ""
+) -> str:
+    dependency_section = (
+        f"\nDependency graph — which other modules import the files above "
+        f"(changing their public functions/signatures can break these callers):\n{dependency_info}\n"
+        if dependency_info
+        else ""
+    )
     return f"""Repository profile:
 {repo_profile}
 
 Relevant code (retrieved by semantic search):
 {context}
-
+{dependency_section}
 Task requested by the user:
 {request}
 

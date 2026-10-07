@@ -12,12 +12,13 @@ from backend.embeddings.vector_search import build_context
 from backend.llm.client import get_default_client
 from backend.llm.confidence_score import score_confidence
 from backend.llm.explanation import build_explanation
+from backend.llm.merge_status import determine_merge_status
 from backend.patch.diff_generator import full_diff
 from backend.patch.git_manager import commit_all
 from backend.patch.rollback import rollback_to
 from backend.planner.change_planner import make_plan
 from backend.planner.file_selector import select_candidate_files
-from backend.repository.dependency_graph import build_blast_radius_summary
+from backend.repository.dependency_graph import build_blast_radius
 from backend.testing.baseline_diff import ValidationDiff, diff_reports
 from backend.testing.retry_agent import generate_and_validate
 
@@ -39,7 +40,7 @@ def chat(req: ChatRequest):
     llm = get_default_client()
     candidate_files = select_candidate_files(session.store, req.message)
     context = build_context(session.store, req.message)
-    dependency_info = build_blast_radius_summary(session.root, candidate_files)
+    dependency_info, blast_radius_count = build_blast_radius(session.root, candidate_files)
     plan = make_plan(llm, req.message, context, session.profile.to_dict(), dependency_info)
 
     heal = generate_and_validate(
@@ -78,6 +79,18 @@ def chat(req: ChatRequest):
         no_test_suite=heal.report.no_test_suite,
     )
 
+    merge_status = determine_merge_status(
+        confidence=confidence,
+        no_test_suite=heal.report.no_test_suite,
+        attempts=heal.attempts,
+        num_risks=len(plan.risks),
+        num_files_changed=len([e for e in heal.edits if e.changed]),
+        blast_radius_count=blast_radius_count,
+        new_security_high=vdiff.new_security_high,
+        new_security_medium=vdiff.new_security_medium,
+        new_static_issues=vdiff.new_static_issues,
+    )
+
     explanation = build_explanation(
         understanding=plan.understanding,
         root_cause=plan.root_cause,
@@ -98,6 +111,11 @@ def chat(req: ChatRequest):
         "explanation": explanation,
         "confidence": confidence,
         "attempts": heal.attempts,
+        "merge_status": {
+            "status": merge_status.status,
+            "reasons": merge_status.reasons,
+            "suggested_actions": merge_status.suggested_actions,
+        },
         "validation": {
             "no_test_suite": heal.report.no_test_suite,
             "new_security_high": vdiff.new_security_high,

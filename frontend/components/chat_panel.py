@@ -7,8 +7,20 @@ import time
 
 import streamlit as st
 
+from frontend.components.theme import status_pill
 from frontend.services.api_client import send_chat
 from frontend.state.session_state import has_loaded_repo
+
+_MERGE_STATUS_PILL_KIND = {
+    "READY": "success",
+    "REVIEW_RECOMMENDED": "warning",
+    "BLOCKED": "danger",
+}
+_MERGE_STATUS_LABEL = {
+    "READY": "Ready to merge",
+    "REVIEW_RECOMMENDED": "Review recommended",
+    "BLOCKED": "Blocked",
+}
 
 
 def render_chat_panel() -> None:
@@ -60,6 +72,19 @@ def render_chat_panel() -> None:
         st.markdown("**Explanation**")
         st.text(result["explanation"])
         st.caption(f"Confidence: {result['confidence']:.0%}")
+
+        ms = result.get("merge_status")
+        if ms:
+            kind = _MERGE_STATUS_PILL_KIND.get(ms["status"], "warning")
+            label = _MERGE_STATUS_LABEL.get(ms["status"], ms["status"])
+            st.markdown(f"**Merge status:** {status_pill(label, kind)}", unsafe_allow_html=True)
+            if ms["reasons"]:
+                st.markdown("Reasons:\n" + "\n".join(f"- {r}" for r in ms["reasons"]))
+            if ms["suggested_actions"]:
+                st.markdown("Suggested actions:\n" + "\n".join(f"- {a}" for a in ms["suggested_actions"]))
+            st.caption(
+                "This is advisory — you decide whether to push regardless of status."
+            )
 
         st.markdown("**Plan**")
         st.json(result["plan"])

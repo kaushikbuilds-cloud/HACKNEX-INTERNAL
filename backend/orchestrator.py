@@ -14,11 +14,12 @@ from backend.embeddings.vector_search import build_context, build_index
 from backend.llm.client import LLMClient, get_default_client
 from backend.llm.confidence_score import score_confidence
 from backend.llm.explanation import build_explanation
+from backend.llm.merge_status import MergeStatus, determine_merge_status
 from backend.patch.rollback import rollback_to
 from backend.planner.change_planner import Plan, make_plan
 from backend.planner.file_selector import select_candidate_files
 from backend.repository.clone_repo import resolve_target
-from backend.repository.dependency_graph import build_blast_radius_summary
+from backend.repository.dependency_graph import build_blast_radius
 from backend.repository.scanner import scan_repo
 from backend.testing.baseline_diff import diff_reports
 from backend.testing.retry_agent import HealResult, generate_and_validate
@@ -34,6 +35,7 @@ class RunResult:
     heal: HealResult
     diff: str
     confidence: float
+    merge_status: MergeStatus
     rolled_back: bool = False
 
     @property
@@ -87,7 +89,7 @@ def run_pipeline(
     # Retrieve relevant files
     candidate_files = select_candidate_files(store, request)
     context = build_context(store, request)
-    dependency_info = build_blast_radius_summary(root, candidate_files)
+    dependency_info, blast_radius_count = build_blast_radius(root, candidate_files)
 
     # Planning agent
     plan = make_plan(llm, request, context, profile.to_dict(), dependency_info)
@@ -115,6 +117,18 @@ def run_pipeline(
         no_test_suite=heal.report.no_test_suite,
     )
 
+    merge_status = determine_merge_status(
+        confidence=confidence,
+        no_test_suite=heal.report.no_test_suite,
+        attempts=heal.attempts,
+        num_risks=len(plan.risks),
+        num_files_changed=len([e for e in heal.edits if e.changed]),
+        blast_radius_count=blast_radius_count,
+        new_security_high=vdiff.new_security_high,
+        new_security_medium=vdiff.new_security_medium,
+        new_static_issues=vdiff.new_static_issues,
+    )
+
     # Self-healing exhausted every retry and never converged — don't leave
     # a broken branch sitting in the repo.
     rolled_back = False
@@ -124,5 +138,6 @@ def run_pipeline(
 
     return RunResult(
         root=root, branch=branch, plan=plan, baseline=baseline,
-        heal=heal, diff=diff, confidence=confidence, rolled_back=rolled_back,
+        heal=heal, diff=diff, confidence=confidence, merge_status=merge_status,
+        rolled_back=rolled_back,
     )

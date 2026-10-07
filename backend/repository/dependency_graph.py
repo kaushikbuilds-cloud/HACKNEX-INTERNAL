@@ -54,19 +54,31 @@ def dependents_of(graph: dict[str, list[str]], module: str) -> list[str]:
     return sorted(m for m, deps in graph.items() if module in deps)
 
 
-def build_blast_radius_summary(root: Path, candidate_files: list[str]) -> str:
+def build_blast_radius(root: Path, candidate_files: list[str]) -> tuple[str, int]:
     """For each candidate file (a relative path), list which other modules
     import it — so the planner can see the blast radius of touching it
-    BEFORE deciding to change it, not just after in an impact report."""
+    BEFORE deciding to change it, not just after in an impact report.
+
+    Returns (human-readable summary, count of distinct modules across the
+    repo that depend on any of the candidate files) — the count is what
+    merge_status.py uses to flag "large blast radius"."""
     graph = build_dependency_graph(root)
     lines = []
+    all_dependents: set[str] = set()
     for rel_path in candidate_files:
         if not rel_path.endswith(".py"):
             continue
         module = _module_name(rel_path)
         dependents = dependents_of(graph, module)
+        all_dependents.update(dependents)
         if dependents:
             lines.append(f"- {rel_path}: imported by {', '.join(dependents)}")
         else:
             lines.append(f"- {rel_path}: no other module in this repo imports it")
-    return "\n".join(lines)
+    return "\n".join(lines), len(all_dependents)
+
+
+def build_blast_radius_summary(root: Path, candidate_files: list[str]) -> str:
+    """Text-only convenience wrapper around build_blast_radius()."""
+    summary, _count = build_blast_radius(root, candidate_files)
+    return summary

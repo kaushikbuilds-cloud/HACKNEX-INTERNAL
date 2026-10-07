@@ -92,23 +92,30 @@ no API key needed.
 ollama pull qwen2.5-coder:3b     # or qwen2.5-coder:1.5b on a smaller GPU
 ```
 
-### 3. Start the backend
+### 3. Configure and launch
 
 ```bash
-export OLLAMA_MODEL=qwen2.5-coder:3b   # match whatever you pulled
-uvicorn backend.app:app --port 8000
+cp .env.example .env    # edit OLLAMA_MODEL to match what you pulled
+python run.py
 ```
 
-### 4. Start the frontend (separate terminal)
+That's it — one command starts the backend, waits for it to be healthy,
+then starts the frontend and opens `http://localhost:8501` in your
+browser. Ctrl+C (or just closing the terminal) stops both cleanly.
+
+Prefer running them separately (e.g. to watch backend logs on their own)?
 
 ```bash
+# Terminal 1
+export OLLAMA_MODEL=qwen2.5-coder:3b
+uvicorn backend.app:app --port 8000
+
+# Terminal 2
 export OLLAMA_MODEL=qwen2.5-coder:3b
 streamlit run frontend/app.py
 ```
 
-Opens at `http://localhost:8501`.
-
-### 5. Use it
+### 4. Use it
 
 1. **Repository Loader** — paste a git URL or local path, click **Load
    repository**. Auto-navigates to Chat Panel once loaded.

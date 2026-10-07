@@ -110,6 +110,7 @@ def run_pipeline(
         new_security_high=vdiff.new_security_high,
         new_security_medium=vdiff.new_security_medium,
         new_static_issues=vdiff.new_static_issues,
+        no_test_suite=heal.report.no_test_suite,
     )
 
     # Self-healing exhausted every retry and never converged — don't leave

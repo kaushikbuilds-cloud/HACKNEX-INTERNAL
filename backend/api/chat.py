@@ -14,6 +14,7 @@ from backend.llm.confidence_score import score_confidence
 from backend.llm.explanation import build_explanation
 from backend.patch.diff_generator import full_diff
 from backend.planner.change_planner import make_plan
+from backend.testing.baseline_diff import ValidationDiff, diff_reports
 from backend.testing.retry_agent import generate_and_validate
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -37,13 +38,14 @@ def chat(req: ChatRequest):
 
     heal = generate_and_validate(
         llm, session.root, session.profile, plan, req.message, context, req.branch,
-        max_attempts=settings.max_retry_attempts,
+        max_attempts=settings.max_retry_attempts, store=session.store,
     )
 
     session.plan = plan
     session.heal = heal
     session.diff = full_diff(heal.edits)
 
+    vdiff = diff_reports(session.baseline, heal.report) if session.baseline else ValidationDiff()
     confidence = score_confidence(
         tests_passed=heal.report.passed,
         attempts=heal.attempts,
@@ -51,6 +53,9 @@ def chat(req: ChatRequest):
         num_risks=len(plan.risks),
         num_files_changed=len([e for e in heal.edits if e.changed]),
         baseline_passed=session.baseline.passed if session.baseline else False,
+        new_security_high=vdiff.new_security_high,
+        new_security_medium=vdiff.new_security_medium,
+        new_static_issues=vdiff.new_static_issues,
     )
 
     explanation = build_explanation(
@@ -70,4 +75,11 @@ def chat(req: ChatRequest):
         "explanation": explanation,
         "confidence": confidence,
         "attempts": heal.attempts,
+        "validation": {
+            "no_test_suite": heal.report.no_test_suite,
+            "new_security_high": vdiff.new_security_high,
+            "new_security_medium": vdiff.new_security_medium,
+            "new_static_issues": vdiff.new_static_issues,
+            "summary": heal.report.summary(),
+        },
     }

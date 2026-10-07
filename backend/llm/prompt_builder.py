@@ -67,3 +67,40 @@ Related code elsewhere in the repo, for context only (do not copy unless genuine
 {related_context}
 
 Output the complete new content of {path} now."""
+
+
+CHUNK_CODEGEN_SYSTEM_PROMPT = """You are a senior software engineer making a minimal, surgical code change to ONE function or class inside a much larger file.
+
+Rules:
+- Output ONLY the replacement code for this function/class, nothing else: no markdown fences, no commentary, no explanations, no surrounding file content.
+- Keep the same name and signature unless the task explicitly requires changing it.
+- Change only what the plan requires. Preserve the existing style, indentation, and unrelated logic inside this function/class.
+- Only use APIs, functions, and imports that already exist in this file or the provided context. Never invent one.
+- Do not add unrelated refactors, comments, or cleanup.
+"""
+
+
+def build_chunk_codegen_prompt(
+    path: str,
+    chunk_name: str,
+    chunk_kind: str,
+    chunk_text: str,
+    plan_summary: str,
+    request: str,
+    related_context: str = "",
+) -> str:
+    return f"""File: {path} (this file is too large to rewrite in full — you are editing one {chunk_kind} inside it: `{chunk_name}`)
+
+Current content of {chunk_kind} `{chunk_name}`:
+```
+{chunk_text}
+```
+
+Overall task: {request}
+
+Plan for this change: {plan_summary}
+
+Related code elsewhere in the repo, for context only (do not copy unless genuinely reusing it):
+{related_context}
+
+Output the complete replacement code for this {chunk_kind} now."""

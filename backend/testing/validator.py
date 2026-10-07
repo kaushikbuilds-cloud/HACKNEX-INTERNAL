@@ -6,7 +6,13 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from typing import TYPE_CHECKING
+
 from backend.repository.repository_profile import RepositoryProfile
+
+if TYPE_CHECKING:
+    from backend.testing.security_scanner import SecurityReport
+    from backend.testing.static_analyzer import StaticReport
 
 
 @dataclass
@@ -26,10 +32,24 @@ class TestReport:
     install: CommandResult | None
     build: CommandResult | None
     test: CommandResult | None
+    static_report: "StaticReport | None" = None
+    security_report: "SecurityReport | None" = None
+    no_test_suite: bool = False
 
     @property
     def passed(self) -> bool:
-        return self.test is not None and self.test.ok
+        # A missing test command (no_test_suite) must NOT count as failure —
+        # otherwise a repo with no test suite (like our actual target may
+        # have) can never report a successful fix, regardless of quality.
+        # Static syntax errors always fail: valid Python going in must stay
+        # valid Python going out, independent of any baseline. Security
+        # findings are intentionally NOT part of pass/fail here — they're
+        # scored as a confidence penalty (new issues vs. baseline) instead,
+        # since gating the self-healing retry loop on them risks the LLM
+        # retrying forever against findings it can't reliably resolve.
+        test_ok = self.test is None or self.test.ok
+        static_ok = self.static_report is None or self.static_report.passed
+        return test_ok and static_ok
 
     def summary(self) -> str:
         lines = []
@@ -38,6 +58,12 @@ class TestReport:
                 continue
             status = "OK" if result.ok else "FAILED"
             lines.append(f"{label}: {status} (`{result.command}`)")
+        if self.no_test_suite:
+            lines.append("test: no test command detected for this repo")
+        if self.static_report is not None:
+            lines.append(self.static_report.summary())
+        if self.security_report is not None:
+            lines.append(self.security_report.summary())
         return "\n".join(lines)
 
 
@@ -49,7 +75,7 @@ def run_command(command: str, cwd: Path, timeout: int = 600) -> CommandResult:
 
 
 def run_validation(
-    root: Path, profile: RepositoryProfile, skip_install: bool = False
+    root: Path, profile: RepositoryProfile, skip_install: bool = False, run_static: bool = True
 ) -> TestReport:
     from backend.testing.build_runner import run_build
     from backend.testing.test_runner import run_tests
@@ -61,7 +87,23 @@ def run_validation(
     build_result = run_build(root, profile)
     test_result = run_tests(root, profile)
 
-    return TestReport(install=install_result, build=build_result, test=test_result)
+    static_report = None
+    security_report = None
+    if run_static:
+        from backend.testing.security_scanner import run_security_scan
+        from backend.testing.static_analyzer import run_static_analysis
+
+        static_report = run_static_analysis(root)
+        security_report = run_security_scan(root)
+
+    return TestReport(
+        install=install_result,
+        build=build_result,
+        test=test_result,
+        static_report=static_report,
+        security_report=security_report,
+        no_test_suite=profile.test_command is None,
+    )
 
 
 def failure_excerpt(report: TestReport, max_chars: int = 4000) -> str:

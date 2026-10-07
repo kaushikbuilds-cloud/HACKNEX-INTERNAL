@@ -16,6 +16,7 @@ from backend.planner.change_planner import Plan, make_plan
 from backend.planner.file_selector import select_candidate_files
 from backend.repository.clone_repo import resolve_target
 from backend.repository.scanner import scan_repo
+from backend.testing.baseline_diff import diff_reports
 from backend.testing.retry_agent import HealResult, generate_and_validate
 from backend.testing.validator import TestReport, run_validation
 
@@ -84,6 +85,7 @@ def run_pipeline(
     from backend.patch.diff_generator import full_diff
 
     diff = full_diff(heal.edits)
+    vdiff = diff_reports(baseline, heal.report)
     confidence = score_confidence(
         tests_passed=heal.report.passed,
         attempts=heal.attempts,
@@ -91,6 +93,9 @@ def run_pipeline(
         num_risks=len(plan.risks),
         num_files_changed=len([e for e in heal.edits if e.changed]),
         baseline_passed=baseline.passed,
+        new_security_high=vdiff.new_security_high,
+        new_security_medium=vdiff.new_security_medium,
+        new_static_issues=vdiff.new_static_issues,
     )
 
     return RunResult(

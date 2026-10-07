@@ -5,3 +5,5 @@ uvicorn[standard]>=0.29
 pydantic>=2.6
 streamlit>=1.33
 pytest>=8.0
+pyflakes>=3.0
+bandit>=1.7

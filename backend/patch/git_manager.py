@@ -26,3 +26,26 @@ def commit_all(root: Path, message: str) -> None:
     repo.git.add(A=True)
     if repo.is_dirty():
         repo.index.commit(message)
+
+
+def has_remote(root: Path, remote: str = "origin") -> bool:
+    repo = git.Repo(root)
+    return remote in [r.name for r in repo.remotes]
+
+
+def push_branch(root: Path, branch: str, remote: str = "origin") -> str:
+    """Push `branch` to `remote`. Never called automatically — the caller
+    (the API layer) only invokes this after the user has explicitly
+    confirmed they want to push. Returns a short human-readable result."""
+    repo = git.Repo(root)
+    if not has_remote(root, remote):
+        raise RuntimeError(f"No '{remote}' remote configured for this repo.")
+
+    remote_obj = repo.remote(remote)
+    push_info = remote_obj.push(refspec=f"{branch}:{branch}", set_upstream=True)
+
+    for info in push_info:
+        if info.flags & info.ERROR:
+            raise RuntimeError(f"Push failed: {info.summary}")
+
+    return f"Pushed '{branch}' to '{remote}'."

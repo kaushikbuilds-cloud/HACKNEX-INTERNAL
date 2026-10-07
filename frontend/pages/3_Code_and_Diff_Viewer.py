@@ -8,6 +8,7 @@ import streamlit as st
 from frontend.components.code_viewer import render_code_viewer
 from frontend.components.diff_viewer import render_diff_viewer
 from frontend.components.file_explorer import render_file_explorer
+from frontend.components.push_panel import render_push_panel
 from frontend.components.sidebar import render_sidebar
 from frontend.components.theme import page_header
 from frontend.state.session_state import init_state
@@ -24,3 +25,5 @@ with left:
     render_code_viewer()
 with right:
     render_diff_viewer()
+
+render_push_panel()

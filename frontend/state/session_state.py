@@ -14,6 +14,9 @@ DEFAULTS = {
     "last_confidence": None,
     "last_diff": None,
     "last_files_changed": None,
+    "last_branch": None,
+    "last_success": None,
+    "push_confirm_armed": False,
 }
 
 

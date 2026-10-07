@@ -13,6 +13,7 @@ from backend.llm.client import get_default_client
 from backend.llm.confidence_score import score_confidence
 from backend.llm.explanation import build_explanation
 from backend.patch.diff_generator import full_diff
+from backend.patch.git_manager import commit_all
 from backend.planner.change_planner import make_plan
 from backend.testing.baseline_diff import ValidationDiff, diff_reports
 from backend.testing.retry_agent import generate_and_validate
@@ -44,6 +45,13 @@ def chat(req: ChatRequest):
     session.plan = plan
     session.heal = heal
     session.diff = full_diff(heal.edits)
+
+    # Commit locally once the fix actually passes validation — never on a
+    # failed/intermediate attempt, and never pushed anywhere yet. Pushing
+    # to the remote is a separate, explicitly user-confirmed step.
+    if heal.report.passed:
+        commit_message = f"swe-agent: {plan.understanding}".strip() or "swe-agent: automated change"
+        commit_all(session.root, commit_message[:200])
 
     vdiff = diff_reports(session.baseline, heal.report) if session.baseline else ValidationDiff()
     confidence = score_confidence(

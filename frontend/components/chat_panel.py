@@ -49,6 +49,8 @@ def render_chat_panel() -> None:
         st.session_state["last_plan"] = result["plan"]
         st.session_state["last_explanation"] = result["explanation"]
         st.session_state["last_confidence"] = result["confidence"]
+        st.session_state["last_branch"] = branch
+        st.session_state["last_success"] = result["success"]
 
         if result["success"]:
             st.success(f"Change succeeded after {result['attempts']} attempt(s).")

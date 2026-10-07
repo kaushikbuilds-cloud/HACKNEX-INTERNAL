@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 import streamlit as st
 
 from frontend.services.api_client import load_repository
@@ -31,3 +33,7 @@ def render_repository_loader() -> None:
                 "Baseline tests are currently failing — that's expected if you're about "
                 "to point the agent at a bug to fix."
             )
+
+        st.info("Taking you to the Chat Panel...")
+        time.sleep(1.2)
+        st.switch_page("pages/2_Chat_Panel.py")

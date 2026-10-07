@@ -20,4 +20,9 @@ def get_patch(session_id: str):
     return {
         "diff": session.diff,
         "files_changed": [e.path for e in session.heal.edits if e.changed],
+        "files": [
+            {"path": e.path, "original": e.original, "new": e.new}
+            for e in session.heal.edits
+            if e.changed
+        ],
     }
